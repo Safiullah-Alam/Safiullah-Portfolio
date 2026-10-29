@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import ThemeToggle from './ThemeToggle'
 
 const navLinks = [
@@ -15,30 +15,67 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeSection, setActiveSection] = useState('hero')
 
+  const isClickScrollingRef = useRef(false)
+  const scrollTimeoutRef = useRef(null)
+
+  const handleNavClick = (sectionId) => {
+    setActiveSection(sectionId)
+    isClickScrollingRef.current = true
+    if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+    scrollTimeoutRef.current = setTimeout(() => {
+      isClickScrollingRef.current = false
+    }, 800)
+  }
+
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20)
 
-      // Section scroll spy
+      if (isClickScrollingRef.current) return
+
       const sections = ['hero', 'about', 'skills', 'projects', 'experience', 'contact']
-      const scrollPos = window.scrollY + 120
+
+      // 1. If user is at the bottom of the page, activate the last section
+      const isAtBottom =
+        window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 60
+
+      if (isAtBottom) {
+        setActiveSection('contact')
+        return
+      }
+
+      // 2. If near top of page, activate hero
+      if (window.scrollY < 100) {
+        setActiveSection('hero')
+        return
+      }
+
+      // 3. Focal point for scroll spy (~160px from viewport top)
+      const focalPoint = 160
+      let matchedSection = ''
 
       for (const sectionId of sections) {
         const el = document.getElementById(sectionId)
         if (el) {
-          const top = el.offsetTop
-          const height = el.offsetHeight
-          if (scrollPos >= top && scrollPos < top + height) {
-            setActiveSection(sectionId)
+          const rect = el.getBoundingClientRect()
+          if (rect.top <= focalPoint && rect.bottom > focalPoint) {
+            matchedSection = sectionId
             break
           }
         }
+      }
+
+      if (matchedSection) {
+        setActiveSection(matchedSection)
       }
     }
 
     window.addEventListener('scroll', handleScroll, { passive: true })
     handleScroll()
-    return () => window.removeEventListener('scroll', handleScroll)
+    return () => {
+      window.removeEventListener('scroll', handleScroll)
+      if (scrollTimeoutRef.current) clearTimeout(scrollTimeoutRef.current)
+    }
   }, [])
 
   // Close mobile menu on resize to desktop
@@ -65,6 +102,7 @@ export default function Navbar() {
           {/* Brand Wordmark */}
           <a
             href="#hero"
+            onClick={() => handleNavClick('hero')}
             className="group flex items-center gap-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#A3FF5F] rounded-lg"
             aria-label="Safiullah Alam - Home"
           >
@@ -84,11 +122,13 @@ export default function Navbar() {
           {/* Desktop Navigation Links */}
           <nav className="hidden md:flex items-center gap-1 bg-white/70 dark:bg-[#14171A]/70 backdrop-blur-md border border-gray-200/70 dark:border-[#232830] px-3 py-1.5 rounded-full shadow-xs">
             {navLinks.map((link) => {
-              const isActive = activeSection === link.href.replace('#', '')
+              const sectionId = link.href.replace('#', '')
+              const isActive = activeSection === sectionId
               return (
                 <a
                   key={link.name}
                   href={link.href}
+                  onClick={() => handleNavClick(sectionId)}
                   className={`px-3.5 py-1.5 rounded-full text-xs font-medium tracking-wide transition-all duration-200 ${
                     isActive
                       ? 'bg-gray-900 text-white dark:bg-[#A3FF5F] dark:text-[#0B0D0F] shadow-xs font-semibold'
@@ -177,12 +217,16 @@ export default function Navbar() {
           <div className="md:hidden py-4 px-3 mb-3 bg-white dark:bg-[#14171A] rounded-2xl border border-gray-200 dark:border-[#232830] shadow-xl animate-fade-in">
             <nav className="flex flex-col gap-1">
               {navLinks.map((link) => {
-                const isActive = activeSection === link.href.replace('#', '')
+                const sectionId = link.href.replace('#', '')
+                const isActive = activeSection === sectionId
                 return (
                   <a
                     key={link.name}
                     href={link.href}
-                    onClick={() => setMobileMenuOpen(false)}
+                    onClick={() => {
+                      handleNavClick(sectionId)
+                      setMobileMenuOpen(false)
+                    }}
                     className={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-[#A3FF5F] text-[#0B0D0F] font-semibold'
